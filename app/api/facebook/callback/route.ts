@@ -33,6 +33,12 @@ export async function GET(request: NextRequest) {
   }
 
   const url = new URL(request.url);
+  
+  // Get the correct origin from proxy headers
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
+  const protocol = request.headers.get("x-forwarded-proto") || "https";
+  const origin = `${protocol}://${host}`;
+  
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
 
@@ -40,14 +46,14 @@ export async function GET(request: NextRequest) {
 
   if (!code || !state || !storedState || state !== storedState) {
     return NextResponse.redirect(
-      `${url.origin}/?error=oauth_state_mismatch`,
+      `${origin}/?error=oauth_state_mismatch`,
       { status: 302 }
     );
   }
 
   const redirectUri =
     process.env.FACEBOOK_REDIRECT_URI ??
-    `${url.origin}/api/facebook/callback`;
+    `${origin}/auth0`;
 
   const tokenUrl = new URL("https://graph.facebook.com/v17.0/oauth/access_token");
   tokenUrl.searchParams.set("client_id", appId);
@@ -61,7 +67,7 @@ export async function GET(request: NextRequest) {
     const errorData = await tokenRes.json();
     console.error("Token exchange failed:", errorData);
     return NextResponse.redirect(
-      `${url.origin}/?error=token_exchange_failed`,
+      `${origin}/?error=token_exchange_failed`,
       { status: 302 }
     );
   }
@@ -84,7 +90,7 @@ export async function GET(request: NextRequest) {
 
   if (!accountsRes.ok) {
     return NextResponse.redirect(
-      `${url.origin}/?error=accounts_fetch_failed`,
+      `${origin}/?error=accounts_fetch_failed`,
       { status: 302 }
     );
   }
@@ -97,7 +103,7 @@ export async function GET(request: NextRequest) {
 
   if (!connectedPage) {
     return NextResponse.redirect(
-      `${url.origin}/?error=no_instagram_account`,
+      `${origin}/?error=no_instagram_account`,
       { status: 302 }
     );
   }
@@ -111,7 +117,7 @@ export async function GET(request: NextRequest) {
     expiresAt,
   };
 
-  const response = NextResponse.redirect(`${url.origin}/?connected=1`, {
+  const response = NextResponse.redirect(`${origin}/?connected=1`, {
     status: 302,
   });
 
