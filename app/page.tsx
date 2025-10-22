@@ -36,7 +36,6 @@ export default async function Home({ searchParams }: HomeProps) {
   const errorMessage =
     (errorKey && ERROR_MESSAGES[errorKey]) ||
     (errorKey ? "Unexpected error. Please try again." : undefined);
-  const showConnectedToast = params?.connected === "1";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-100 text-zinc-900">
@@ -82,79 +81,13 @@ export default async function Home({ searchParams }: HomeProps) {
           </div>
         )}
 
-        {showConnectedToast && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            Facebook connection complete. Fetching Instagram media…
-          </div>
-        )}
-
-        <section className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold">
-              1. Authenticate with Facebook
-            </h2>
-            <p className="text-sm text-zinc-600">
-              We redirect to the Facebook dialog, request{" "}
-              <code className="rounded bg-zinc-100 px-1 py-0.5">
-                pages_show_list
-              </code>
-              ,{" "}
-              <code className="rounded bg-zinc-100 px-1 py-0.5">
-                instagram_basic
-              </code>{" "}
-              and{" "}
-              <code className="rounded bg-zinc-100 px-1 py-0.5">
-                instagram_content_publish
-              </code>{" "}
-              scopes, then exchange the code for a user access token and page
-              token server-side.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold">
-              2. Fetch Instagram business media
-            </h2>
-            <p className="text-sm text-zinc-600">
-              After we capture the page token, we hit{" "}
-              <code className="rounded bg-zinc-100 px-1 py-0.5">
-                /{`{instagram_business_id}`}/media
-              </code>{" "}
-              to pull the latest posts, including captions and basic engagement
-              counts.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold">
-              3. Publish and rank engagement
-            </h2>
-            <p className="text-sm text-zinc-600">
-              Use the prototype publisher to create Instagram media and review a
-              lightweight leaderboard of posts ranked by
-              <code className="ml-1 rounded bg-zinc-100 px-1 py-0.5">
-                likes + comments
-              </code>
-              .
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold">
-              4. Account health overview
-            </h2>
-            <p className="text-sm text-zinc-600">
-              We combine daily Instagram insights to show follower growth,
-              reach, impressions, profile views, and website clicks in an
-              account-level table with 7 and 28 day snapshots.
-            </p>
-          </div>
-        </section>
-
         {session ? (
           <div className="space-y-8">
+            <InstagramFeed />
             <CreatePostForm />
             <AccountInsightsTable />
             <InsightsHighlight />
             <AiInsightsPanel />
-            <InstagramFeed />
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-12 text-center text-sm text-zinc-500">
@@ -162,22 +95,6 @@ export default async function Home({ searchParams }: HomeProps) {
             and feed preview.
           </div>
         )}
-
-        <footer className="mt-auto border-t border-zinc-200 pt-6 text-xs text-zinc-500">
-          Use environment variables{" "}
-          <code className="rounded bg-zinc-100 px-1 py-0.5">
-            FACEBOOK_APP_ID
-          </code>{" "}
-          and{" "}
-          <code className="rounded bg-zinc-100 px-1 py-0.5">
-            FACEBOOK_APP_SECRET
-          </code>{" "}
-          to configure this setup. Optionally override{" "}
-          <code className="rounded bg-zinc-100 px-1 py-0.5">
-            FACEBOOK_REDIRECT_URI
-          </code>{" "}
-          for production domains.
-        </footer>
       </main>
     </div>
   );
