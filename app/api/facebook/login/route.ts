@@ -17,10 +17,16 @@ export async function GET(request: Request) {
   }
 
   const state = crypto.randomBytes(16).toString("hex");
-  const origin = new URL(request.url).origin;
+  
+  // Get the correct origin from proxy headers
+  const url = new URL(request.url);
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
+  const protocol = request.headers.get("x-forwarded-proto") || "https";
+  const origin = `${protocol}://${host}`;
+  
   const redirectUri =
     process.env.FACEBOOK_REDIRECT_URI ??
-    `${origin}/api/facebook/callback`;
+    `${origin}/auth0`;
   const scopes = process.env.FACEBOOK_SCOPES ?? DEFAULT_SCOPES;
 
   const authUrl = new URL("https://www.facebook.com/v17.0/dialog/oauth");
