@@ -188,15 +188,23 @@ type MediaInsightsResponse = {
   }>;
 };
 
-export type MediaInsights = Record<MediaInsightsMetric, number>;
+export type MediaInsights = Partial<Record<MediaInsightsMetric, number>>;
 
 function metricsForMediaType(
   mediaType: string | undefined
 ): MediaInsightsMetric[] {
   switch (mediaType) {
     case "VIDEO":
-      // FEED video posts
-      return ["reach", "saved", "views", "likes", "comments", "shares", "total_interactions", "profile_visits", "profile_activity"];
+      // Feed videos do not expose profile metrics
+      return [
+        "reach",
+        "saved",
+        "views",
+        "likes",
+        "comments",
+        "shares",
+        "total_interactions",
+      ];
     case "REELS":
       // Reels-specific metrics
       return ["reach", "saved", "views", "likes", "comments", "shares", "total_interactions", "follows", "ig_reels_avg_watch_time", "ig_reels_video_view_total_time"];
@@ -262,7 +270,10 @@ type AccountInsightsDailyResponse = {
   data: Array<{
     name: AccountInsightsMetric;
     period: string;
-    values: Array<{ value: number; end_time: string }>;
+    title?: string;
+    description?: string;
+    total_value?: { value: number };
+    values?: Array<{ value: number | Record<string, number>; end_time: string }>;
   }>;
 };
 
@@ -286,8 +297,16 @@ export async function fetchAccountInsights(
   session: FacebookSession,
   params?: FetchAccountInsightsParams
 ): Promise<AccountInsights> {
-  const periodDays = params?.periodDays ?? 30;
-  const since = Math.floor(Date.now() / 1000) - periodDays * 24 * 60 * 60;
+  const requestedDays = Number.isFinite(params?.periodDays)
+    ? Number(params?.periodDays)
+    : 28;
+  const daySeconds = 24 * 60 * 60;
+  const until = Math.floor(Date.now() / 1000);
+  const clampedRange = Math.min(
+    Math.max(requestedDays, 1) * daySeconds,
+    30 * daySeconds - 60
+  );
+  const since = Math.max(until - clampedRange, 0);
 
   const dailyUrl = new URL(
     `https://graph.facebook.com/v17.0/${session.instagramBusinessId}/insights`
@@ -312,6 +331,7 @@ export async function fetchAccountInsights(
   dailyUrl.searchParams.set("metric_type", "total_value");
   dailyUrl.searchParams.set("access_token", session.pageAccessToken);
   dailyUrl.searchParams.set("since", String(since));
+  dailyUrl.searchParams.set("until", String(until));
 
   const followerUrl = new URL(
     `https://graph.facebook.com/v17.0/${session.instagramBusinessId}`
@@ -335,30 +355,26 @@ export async function fetchAccountInsights(
   const dailyJson = (await dailyRes.json()) as AccountInsightsDailyResponse;
   const followerJson = (await followerRes.json()) as { followers_count?: number };
 
+  console.log("[Account Insights] Raw API response:", JSON.stringify(dailyJson, null, 2));
+
   const followerCount = followerJson.followers_count ?? null;
 
   const dailyTotals =
     dailyJson.data.reduce<AccountInsights["dailyTotals"]>((acc, metric) => {
-      const values = metric.values ?? [];
-      const sorted = [...values].sort(
-        (a, b) =>
-          new Date(a.end_time).getTime() - new Date(b.end_time).getTime()
-      );
+      // Handle new API format with total_value object
+      const totalValue = metric.total_value?.value ?? 0;
 
-      const last7Days = sorted
-        .slice(-7)
-        .reduce((sum, item) => sum + (item.value ?? 0), 0);
-      const last28Days = sorted
-        .slice(-28)
-        .reduce((sum, item) => sum + (item.value ?? 0), 0);
-
+      // For now, use total_value for both periods since API returns aggregated totals
+      // In the future, we could fetch different time periods separately
       acc[metric.name] = {
-        last7Days,
-        last28Days,
-        timeseries: sorted.map((item) => ({
-          date: item.end_time,
-          value: item.value ?? 0,
-        })),
+        last7Days: totalValue,
+        last28Days: totalValue,
+        timeseries: [
+          {
+            date: new Date().toISOString(),
+            value: totalValue,
+          },
+        ],
       };
 
       return acc;

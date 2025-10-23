@@ -7,7 +7,10 @@ import DisconnectButton from "./components/DisconnectButton";
 import InstagramFeed from "./components/InstagramFeed";
 import InsightsHighlight from "./components/InsightsHighlight";
 import AiInsightsPanel from "./components/AiInsightsPanel";
-import { readSessionFromCookies } from "@/lib/facebookSession";
+import {
+  readPendingSessionFromCookies,
+  readSessionFromCookies,
+} from "@/lib/facebookSession";
 
 type HomeProps = {
   searchParams?: Promise<{
@@ -25,12 +28,17 @@ const ERROR_MESSAGES: Record<string, string> = {
     "We could not list your Facebook pages. Make sure the user granted pages access.",
   no_instagram_account:
     "No Instagram business account is linked to the selected page.",
+  pending_session_expired:
+    "We could not hold the login session. Please connect with Facebook again.",
+  page_selection_invalid:
+    "The selected page is no longer available. Reconnect with Facebook to continue.",
   media_fetch_failed:
     "We could not fetch Instagram media for this account. Verify its permissions.",
 };
 
 export default async function Home({ searchParams }: HomeProps) {
   const session = await readSessionFromCookies();
+  const pendingSelection = await readPendingSessionFromCookies();
   const params = await searchParams;
   const errorKey = params?.error;
   const errorMessage =
@@ -80,6 +88,15 @@ export default async function Home({ searchParams }: HomeProps) {
             {errorMessage}
           </div>
         )}
+
+        {!session && pendingSelection?.pages.length ? (
+          <div className="rounded-lg border border-[#1877f2]/20 bg-[#1877f2]/10 px-4 py-3 text-sm text-[#0f6ad8]">
+            We found multiple eligible pages for this Facebook account.{" "}
+            <Link className="font-semibold underline" href="/select-page">
+              Choose a page to continue.
+            </Link>
+          </div>
+        ) : null}
 
         {session ? (
           <div className="space-y-8">

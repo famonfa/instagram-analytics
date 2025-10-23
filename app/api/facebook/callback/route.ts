@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   clearStateCookie,
+  clearSessionCookie,
+  clearPendingSessionCookie,
   readStateFromCookies,
   withSessionCookie,
+  withPendingSessionCookie,
+  FacebookPageOption,
 } from "@/lib/facebookSession";
+import { resolveRequestOrigin } from "@/lib/requestOrigin";
 
 type TokenResponse = {
   access_token: string;
@@ -33,12 +38,32 @@ export async function GET(request: NextRequest) {
   }
 
   const url = new URL(request.url);
-  
-  // Get the correct origin from proxy headers
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
-  const protocol = request.headers.get("x-forwarded-proto") || "https";
-  const origin = `${protocol}://${host}`;
-  
+  const origin = resolveRequestOrigin(request);
+  const defaultRedirect = new URL("/auth0", origin).toString();
+  const configuredRedirect = process.env.FACEBOOK_REDIRECT_URI;
+  let redirectUri = defaultRedirect;
+
+  if (configuredRedirect) {
+    try {
+      const redirectUrl = new URL(configuredRedirect, origin);
+      if (
+        origin &&
+        !origin.includes("localhost") &&
+        redirectUrl.host.includes("localhost")
+      ) {
+        redirectUri = defaultRedirect;
+      } else {
+        redirectUri = redirectUrl.toString();
+      }
+    } catch (error) {
+      console.warn(
+        "Invalid FACEBOOK_REDIRECT_URI value, falling back to default",
+        configuredRedirect,
+        error
+      );
+    }
+  }
+
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
 
@@ -50,10 +75,6 @@ export async function GET(request: NextRequest) {
       { status: 302 }
     );
   }
-
-  const redirectUri =
-    process.env.FACEBOOK_REDIRECT_URI ??
-    `${origin}/auth0`;
 
   const tokenUrl = new URL("https://graph.facebook.com/v17.0/oauth/access_token");
   tokenUrl.searchParams.set("client_id", appId);
@@ -96,33 +117,57 @@ export async function GET(request: NextRequest) {
   }
 
   const accountsJson = (await accountsRes.json()) as AccountsResponse;
-  const connectedPage = accountsJson.data.find(
-    (page) => page.instagram_business_account?.id
-  );
-  // todo: the ui should show a seection screen if there are more than one page with ig account
+  const candidatePages: FacebookPageOption[] = accountsJson.data
+    .filter((page) => page.instagram_business_account?.id)
+    .map((page) => ({
+      pageId: page.id,
+      pageName: page.name,
+      pageAccessToken: page.access_token,
+      instagramBusinessId: page.instagram_business_account!.id,
+    }));
 
-  if (!connectedPage) {
+  if (candidatePages.length === 0) {
     return NextResponse.redirect(
       `${origin}/?error=no_instagram_account`,
       { status: 302 }
     );
   }
 
-  const session = {
+  if (candidatePages.length === 1) {
+    const selectedPage = candidatePages[0];
+    const session = {
+      userAccessToken,
+      pageAccessToken: selectedPage.pageAccessToken,
+      pageId: selectedPage.pageId,
+      pageName: selectedPage.pageName,
+      instagramBusinessId: selectedPage.instagramBusinessId,
+      expiresAt,
+    };
+
+    const response = NextResponse.redirect(`${origin}/?connected=1`, {
+      status: 302,
+    });
+
+    clearStateCookie(response);
+    clearPendingSessionCookie(response);
+    withSessionCookie(response, session);
+
+    return response;
+  }
+
+  const pendingSession = {
     userAccessToken,
-    pageAccessToken: connectedPage.access_token,
-    pageId: connectedPage.id,
-    pageName: connectedPage.name,
-    instagramBusinessId: connectedPage.instagram_business_account!.id,
+    pages: candidatePages,
     expiresAt,
   };
 
-  const response = NextResponse.redirect(`${origin}/?connected=1`, {
+  const response = NextResponse.redirect(`${origin}/select-page`, {
     status: 302,
   });
 
   clearStateCookie(response);
-  withSessionCookie(response, session);
+  clearSessionCookie(response);
+  withPendingSessionCookie(response, pendingSession);
 
   return response;
 }

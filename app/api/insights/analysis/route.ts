@@ -11,6 +11,8 @@ type PostSummary = {
   id: string;
   caption: string | undefined;
   media_type: string;
+  media_url: string | undefined;
+  thumbnail_url: string | undefined;
   permalink: string;
   timestamp: string;
   like_count: number;
@@ -27,24 +29,15 @@ type AnalysisResult = {
 const DEFAULT_MODEL = "gpt-4o-mini";
 
 async function collectPostSummaries(session: Parameters<typeof fetchInstagramMedia>[0]) {
-  const media = await fetchInstagramMedia(session, { limit: 12 });
+  const media = await fetchInstagramMedia(session, { limit: 50 });
 
   if (!media.length) {
     return [];
   }
 
-  const topByEngagement = [...media]
-    .map((item) => ({
-      item,
-      engagement:
-        (item.like_count ?? 0) +
-        (item.comments_count ?? 0),
-    }))
-    .sort((a, b) => b.engagement - a.engagement)
-    .slice(0, 5);
-
+  // Analyze all posts, not just top 5
   const enriched = await Promise.all(
-    topByEngagement.map(async ({ item }) => {
+    media.map(async (item) => {
       try {
         const insights = await fetchMediaInsights(
           session,
@@ -56,6 +49,8 @@ async function collectPostSummaries(session: Parameters<typeof fetchInstagramMed
           id: item.id,
           caption: item.caption,
           media_type: item.media_type,
+          media_url: item.media_url,
+          thumbnail_url: item.thumbnail_url,
           permalink: item.permalink,
           timestamp: item.timestamp,
           like_count: item.like_count ?? 0,
@@ -77,6 +72,8 @@ async function collectPostSummaries(session: Parameters<typeof fetchInstagramMed
           id: item.id,
           caption: item.caption,
           media_type: item.media_type,
+          media_url: item.media_url,
+          thumbnail_url: item.thumbnail_url,
           permalink: item.permalink,
           timestamp: item.timestamp,
           like_count: item.like_count ?? 0,
@@ -94,6 +91,8 @@ function buildPrompt(posts: PostSummary[]) {
   const dataset = posts.map((post) => ({
     id: post.id,
     mediaType: post.media_type,
+    mediaUrl: post.media_url,
+    thumbnailUrl: post.thumbnail_url,
     caption: post.caption,
     permalink: post.permalink,
     timestamp: post.timestamp,
@@ -106,7 +105,7 @@ function buildPrompt(posts: PostSummary[]) {
     "You are an Instagram marketing strategist. Review the supplied posts and determine which one drove the most impact.",
     "Impact should consider total engagement (likes, comments, saves, shares, plays, reach, impressions) when available.",
     "Respond with three sections:",
-    "1. `Top Post` — identify the winning post (mention its ID and media type) and explain performance drivers.",
+    "1. `Top Post` — identify the winning post by its ID, media type, AND include the mediaUrl or thumbnailUrl so the user can see which post it is.",
     "2. `Why it worked` — list 2-3 concise bullet points grounded in the metrics and caption.",
     "3. `Recommendations` — provide 3 actionable suggestions to replicate or improve future performance.",
     "",

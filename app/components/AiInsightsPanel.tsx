@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 import { POST_CREATED_EVENT } from "@/lib/events";
 
@@ -111,12 +112,42 @@ export default function AiInsightsPanel() {
             </code>{" "}
             · Reviewed posts: {analysis.analyzedPosts}
           </div>
-          <div className="prose prose-sm max-w-none text-zinc-900">
-            {analysis.summary.split("\n").map((line, index) => (
-              <p key={index} className="whitespace-pre-wrap">
-                {line}
-              </p>
-            ))}
+          <div className="prose prose-sm prose-zinc max-w-none prose-headings:text-zinc-800 prose-strong:text-zinc-900 prose-p:text-zinc-700 prose-li:text-zinc-700">
+            <ReactMarkdown
+              components={{
+                img: (props) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    {...props}
+                    alt={props.alt || "Post thumbnail"}
+                    className="max-w-xs rounded-lg border border-zinc-200 shadow-sm"
+                    loading="lazy"
+                  />
+                ),
+                a: (props) => (
+                  <a
+                    {...props}
+                    className="text-blue-600 hover:text-blue-800 underline decoration-blue-200 hover:decoration-blue-400"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                ),
+                h3: (props) => (
+                  <h3 {...props} className="text-lg font-semibold text-zinc-800 mt-6 mb-3 border-b border-zinc-200 pb-2" />
+                ),
+                ul: (props) => (
+                  <ul {...props} className="space-y-2 ml-4" />
+                ),
+                li: (props) => (
+                  <li {...props} className="text-zinc-700 leading-relaxed" />
+                ),
+                p: (props) => (
+                  <p {...props} className="text-zinc-700 leading-relaxed mb-4" />
+                ),
+              }}
+            >
+              {analysis.summary}
+            </ReactMarkdown>
           </div>
         </div>
       )}

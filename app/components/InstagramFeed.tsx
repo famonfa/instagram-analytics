@@ -135,14 +135,37 @@ export default function InstagramFeed() {
       {hasPosts && (
         <div className="grid gap-4 sm:grid-cols-2">
           {posts.map((post) => {
-            const imageUrl = post.media_url ?? post.thumbnail_url;
+            const isVideo =
+              post.media_type === "VIDEO" || post.media_type === "REELS";
+            const imageUrl = !isVideo
+              ? post.media_url ?? post.thumbnail_url
+              : post.thumbnail_url ?? undefined;
+            const videoUrl = isVideo ? post.media_url : undefined;
 
             return (
               <article
                 key={post.id}
                 className="flex flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm"
               >
-                {imageUrl ? (
+                {isVideo && videoUrl ? (
+                  <a
+                    href={post.permalink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="relative block h-56 w-full"
+                  >
+                    <video
+                      src={videoUrl}
+                      poster={imageUrl}
+                      className="h-full w-full object-cover"
+                      muted
+                      playsInline
+                      autoPlay
+                      loop
+                      preload="metadata"
+                    />
+                  </a>
+                ) : imageUrl ? (
                   <a
                     href={post.permalink}
                     target="_blank"
